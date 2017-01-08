@@ -1,0 +1,5 @@
+<Accounts>
+   <Account username="test" password="test" notes="Main" />
+   <Account username="test2" password="test2" notes="ESEA acc" />
+   <Account username="test3" password="test4" notes="Smurf acc" />
+</Accounts>
