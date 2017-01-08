@@ -34,10 +34,11 @@ namespace SteamAccountManager
                                 username = xmlReader.GetAttribute("username");
                                 password = xmlReader.GetAttribute("password");
                                 notes = xmlReader.GetAttribute("notes");
-                                string[] row = { username, password, notes };
+                                string[] row = { username, "*********", notes };
                                 if (!username.Equals(""))
                                 {
                                     ListViewItem lvi = new ListViewItem(row);
+                                    lvi.Tag = password;
                                     listView1.Items.Add(lvi);
                                 }
                             }
@@ -81,7 +82,7 @@ namespace SteamAccountManager
         private void logIntoAcc()
         {
             string username = listView1.SelectedItems[0].SubItems[0].Text;
-            string password = listView1.SelectedItems[0].SubItems[1].Text;
+            var password = listView1.SelectedItems[0].Tag;
             foreach (var process in Process.GetProcessesByName("Steam"))
             {
                 process.Kill();
