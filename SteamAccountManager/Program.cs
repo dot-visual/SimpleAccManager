@@ -16,7 +16,7 @@ namespace SteamAccountManager
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new Accmanager());
+            Application.Run(new AccountMngr());
         }
     }
 }
