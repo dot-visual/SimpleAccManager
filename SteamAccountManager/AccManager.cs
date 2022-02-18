@@ -9,6 +9,7 @@ using System.Windows.Forms;
 using System.Xml;
 using System.IO;
 using System.Diagnostics;
+using System.Security.Cryptography;
 
 namespace SteamAccountManager
 {
@@ -19,31 +20,15 @@ namespace SteamAccountManager
             InitializeComponent();
         }
 
-        private void button1_Click(object sender, EventArgs e)
-        {
-            Properties.Settings.Default["ConfigPath"] = txtConfigPath.Text;
-            Properties.Settings.Default.Save();
-            LoadAccs();
-        }
-
         private void AccountMngr_Load(object sender, EventArgs e)
         {
-            try
+            String configPath = Properties.Settings.Default["ConfigPath"].ToString();
+            String steamPath = Properties.Settings.Default["SteamPath"].ToString();
+            if (configPath != String.Empty && steamPath != String.Empty)
             {
-                String configPath = Properties.Settings.Default["ConfigPath"].ToString();
-
-                if (configPath != String.Empty)
-                {
-                    txtConfigPath.Text = configPath;
-                    LoadAccs();
-                }
-
+                txtConfigPath.Text = configPath;
+                txtSteamPath.Text = steamPath;
             }
-            catch (Exception)
-            {
-                MessageBox.Show("Input Config path first!");
-            }
-
         }
 
         private void lvAccounts_MouseClick(object sender, MouseEventArgs e)
@@ -52,88 +37,171 @@ namespace SteamAccountManager
             {
                 if (lvAccounts.FocusedItem.Bounds.Contains(e.Location) == true)
                 {
-                    contextMenuStrip1.Show(Cursor.Position);
+                    cMSAccounts.Show(Cursor.Position);
                 }
             }
         }
 
         private void loginToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            logIntoAcc();
-        }
-
-        private void logIntoAcc()
-        {
-            string username = lvAccounts.SelectedItems[0].SubItems[0].Text;
-            var password = lvAccounts.SelectedItems[0].Tag;
-            foreach (var process in Process.GetProcessesByName("Steam"))
+            AddAccount frmAddAccount = new AddAccount();
+            if(frmAddAccount.ShowDialog(this) == DialogResult.OK)
             {
-                process.Kill();
+                lvAccounts.Items.Add(frmAddAccount.getAccount());
+                btnSave.Enabled = true;
             }
-            Process.Start("C:\\Program Files (x86)\\Steam\\Steam.exe", " -login " + username + " " + password);
+            frmAddAccount.Close();
+            frmAddAccount.Dispose();
         }
 
         private void lvAccounts_DoubleClick(object sender, EventArgs e)
         {
-            logIntoAcc();
+            string username = lvAccounts.SelectedItems[0].SubItems[0].Text;
+            var password = lvAccounts.SelectedItems[0].Tag;
+            if (txtSteamPath.Text == String.Empty)
+            {
+                MessageBox.Show("Please specify your Steam Path first.");
+                return;
+            }
+           
+            foreach (var process in Process.GetProcessesByName("Steam"))
+            {
+                process.Kill();
+            }
+            Process.Start(txtSteamPath.Text, " -login " + username + " " + password);
         }
 
-        private void txtConfigPath_DragDrop(object sender, DragEventArgs e)
+        private void lvAccounts_MouseDown(object sender, MouseEventArgs e)
         {
-            string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
-            if (files != null && files.Length != 0)
+            if(e.Button == MouseButtons.Right)
             {
-                txtConfigPath.Text = files[0];
+                var focusedItem = lvAccounts.FocusedItem;
+                {
+                    cMSAccounts.Show(Cursor.Position);
+                }
             }
         }
 
-        private void txtConfigPath_DragEnter(object sender, DragEventArgs e)
+        private void DeleteItem_Click(object sender, EventArgs e)
         {
-            if (e.Data.GetDataPresent(DataFormats.FileDrop, false) == true)
+            //MessageBox.Show(lvAccounts.Items[0].Tag.ToString());
+            foreach (ListViewItem item in lvAccounts.SelectedItems)
             {
-                e.Effect = DragDropEffects.All;
+                lvAccounts.Items.Remove(item);
             }
+            btnSave.Enabled = lvAccounts.Items.Count > 0;
         }
 
-        private Boolean LoadAccs()
+        private void btnSave_Click(object sender, EventArgs e)
         {
+            XmlTextWriter xmlWriter = new XmlTextWriter(txtConfigPath.Text, System.Text.Encoding.ASCII);
+            xmlWriter.Formatting = Formatting.Indented;
+
+            xmlWriter.WriteStartDocument();
+            xmlWriter.WriteStartElement("Accounts");
+
+            foreach (ListViewItem item in lvAccounts.Items)
+            {
+                XmlDocument doc = new XmlDocument();
+                doc.LoadXml("<Account/>");
+                XmlAttribute username = doc.CreateAttribute("username");
+                username.InnerText = item.SubItems[0].Text;
+                XmlAttribute pw = doc.CreateAttribute("password");
+                pw.InnerText = Convert.ToBase64String(AESHelper.EncryptStringToBytes(item.Tag.ToString(), txtPassword.Text));
+                XmlAttribute desc = doc.CreateAttribute("description");
+                desc.InnerText = item.SubItems[2].Text;
+                doc.DocumentElement.Attributes.Append(username);
+                doc.DocumentElement.Attributes.Append(pw);
+                doc.DocumentElement.Attributes.Append(desc);
+                doc.WriteContentTo(xmlWriter);
+            }
+
+            xmlWriter.WriteEndElement();
+            xmlWriter.WriteEndDocument();
+            xmlWriter.Flush();
+            xmlWriter.Close();
+
+            Properties.Settings.Default["ConfigPath"] = txtConfigPath.Text;
+            Properties.Settings.Default["SteamPath"] = txtSteamPath.Text;
+            Properties.Settings.Default.Save();
+            MessageBox.Show("Accounts saved Sucessfully.", "Saved");
+        }
+
+        private void txtPassword_TextChanged(object sender, EventArgs e)
+        {
+            btnSave.Enabled = (txtPassword.TextLength > 0);
+            btnLoadConfig.Enabled = (txtConfigPath.TextLength > 0 && txtPassword.TextLength > 0);
+        }
+
+        private void btnConfigPath_Click(object sender, EventArgs e)
+        {
+            string path = txtConfigPath.Text;
             try
             {
-                string path = txtConfigPath.Text;
-
                 if (File.Exists(path))
                 {
-                    XmlTextReader xmlReader = new XmlTextReader(path);
+                    lvAccounts.Items.Clear();
+                    StreamReader sReader = new StreamReader(path, System.Text.Encoding.ASCII);
+                    XmlTextReader xmlReader = new XmlTextReader(sReader);
+
                     string username = string.Empty;
                     string password = string.Empty;
-                    string notes = string.Empty;
+                    string desc = string.Empty;
 
                     while (xmlReader.Read())
                     {
                         if (xmlReader.NodeType == XmlNodeType.Element && xmlReader.Name.Equals("Account"))
                         {
-
                             username = xmlReader.GetAttribute("username");
                             password = xmlReader.GetAttribute("password");
-                            notes = xmlReader.GetAttribute("notes");
-                            string[] row = { username, "*********", notes };
-                            if (!username.Equals(""))
+                            desc = xmlReader.GetAttribute("description");
+                            string[] row = { username, "*********", desc };
+                            if (!username.Equals("") && !password.Equals(""))
                             {
                                 ListViewItem lvi = new ListViewItem(row);
-                                lvi.Tag = password;
+                                lvi.Tag = AESHelper.DecryptStringFromBytes(Convert.FromBase64String(password), txtPassword.Text);
                                 lvAccounts.Items.Add(lvi);
                             }
-
                         }
                     }
+                    xmlReader.Close();
+                    xmlReader.Dispose();
                 }
-                return true;
             }
             catch (Exception)
             {
-                return false;
+                MessageBox.Show("Wrong Password!","Please try again.");
             }
+        }
+        private void txtConfigPath_TextChanged(object sender, EventArgs e)
+        {
+            btnLoadConfig.Enabled = txtConfigPath.TextLength > 0 && txtPassword.TextLength > 0;
+        }
+        private void btnOpenConfig_Click(object sender, EventArgs e)
+        {
+            OpenFileDialog ofd = new OpenFileDialog();
+            ofd.Filter = "Xml Files (*.xml)|*.xml";
+            ofd.FilterIndex = 1;
+            ofd.Multiselect = false;
 
+            if (ofd.ShowDialog() == DialogResult.OK)
+            {
+                txtConfigPath.Text = ofd.FileName;
+            }
+            ofd.Dispose();
+        }
+        private void btnOpenSteamPath_Click(object sender, EventArgs e)
+        {
+            OpenFileDialog ofd = new OpenFileDialog();
+            ofd.Filter = "Exe Files (*.exe)|*.exe";
+            ofd.FilterIndex = 1;
+            ofd.Multiselect = false;
+
+            if (ofd.ShowDialog() == DialogResult.OK)
+            {
+                txtSteamPath.Text = ofd.FileName;
+            }
+            ofd.Dispose();
         }
     }
 }
