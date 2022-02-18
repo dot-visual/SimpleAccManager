@@ -1,6 +1,6 @@
 ## Steam Account Manager
 
-![Menu Screenshot](images/Menu.png)
+![Menu Screenshot](https://github.com/VisualCH/SimpleAccManager/blob/master/Images/Menu.png)
 
 This Simple Account Manager allows to easily manage and switch between your Steam accounts.
 Your account data will be saved into an xml file. All passwords are SHA256 encrypted.
