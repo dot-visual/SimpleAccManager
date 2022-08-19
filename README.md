@@ -8,9 +8,9 @@ By double clicking an account you automatically log into it.
 
 ## How It Works
 
-* Choose a path and filename for your account data
-* Insert the path to your Steam.exe
-* Type in a password to encrypt your passwords with.
-* Right click in the list to either add or delete an account.
-* Press Save to save all account data into an xml file.
-* By double clicking an account you automatically log into it.
+1. Choose a path and filename for your account data
+2. Insert the path to your Steam.exe
+3. Type in a password to encrypt your passwords with.
+4. Right click in the list to either add or delete an account.
+5. Press Save to save all account data into an xml file.
+6. Double click any account in order to log into it.
